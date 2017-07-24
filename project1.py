@@ -12,14 +12,23 @@ def RSIDfinder(rsid, filename):
         data = fin.read()
         return True if (rsid in data) else False
 
-def geneInfo(rsid, genotype, filename):
-    """geneInfo returns the data associated with a gene, if the gene is in a person's genetic code."""
-    #project.geneInfo('i6033897','II', 'myGenome.txt')
+def findChromosome(rsid, genotype, filename):
+    """geneInfo returns the chromosome associated with a gene, if the gene is in a person's genetic code."""
+    #project.chromosome('i6033897','II', 'myGenome.txt')
     if geneFinder(rsid, genotype, filename):
         with open(filename, 'rt') as fin:
             for line in open(filename, 'rt').readlines()[20:]:
                 if (rsid in line) and (genotype in line):
-                    return line.split()
+                    return line.split()[1]
+
+def position(rsid, filename):
+    """geneInfo returns the chromosome associated with a gene, if the gene is in a person's genetic code."""
+    #project.chromosome('i6033897','II', 'myGenome.txt')
+    if RSIDfinder(rsid, filename):
+        with open(filename, 'rt') as fin:
+            for line in open(filename, 'rt').readlines()[20:]:
+                if (rsid in line):
+                    return int(line.split()[2])
                     
 def diseaseID(disease):
     """diseaseID returns the page ID that corresponds to the disease inputted by the user."""
@@ -46,14 +55,57 @@ def diseasePage(disease):
     r = requests.get(disease_url)
     return r.json()['query']['pages'][pageid]['fullurl']
 
-def diseasePageScraper():
+def diseasePageScraper(disease):
     """Scrapes a disease page for URL's to relevant SNP's. Will return a list."""
     from bs4 import BeautifulSoup
     import urllib.request
     import re
-    html_page = urllib.request.urlopen("https://bots.snpedia.com/index.php/Intelligence")
+    html_page = urllib.request.urlopen(diseasePage(disease))
     soup = BeautifulSoup(html_page, "lxml")
     urls = []
     for link in soup.findAll('a', attrs={'href': re.compile("^/index.php/Rs")}):
         urls.append("https://bots.snpedia.com" + link.get('href'))
+    for link in soup.findAll('a', attrs={'href': re.compile("^/index.php/I[0-9]{1,10}")}):
+        urls.append("https://bots.snpedia.com" + link.get('href'))
     return urls
+
+def genePageScraper(disease, filename):
+    from bs4 import BeautifulSoup
+    import urllib.request
+    import re
+    geneLinks = diseasePageScraper(disease)
+    geneInfo = []
+    for link in geneLinks:
+        rsid = link[35:]
+        if RSIDfinder(rsid.lower(), filename):
+            html_page = urllib.request.urlopen(link)
+            soup = BeautifulSoup(html_page, "lxml")
+            table = soup.find('table' ,attrs={'class':'sortable smwtable'}).find_all("tr")
+            urls=[]
+            for row in table[1:]:
+                cells = row.find_all("td")
+
+                
+                if position(rsid.lower(), filename)>2700157:
+                    genotype = cells[0].get_text().strip()[1]
+                else:
+                    genotype = cells[0].get_text().strip()[1] + cells[0].get_text().strip()[3]
+                #code block above is correct
+                if geneFinder(rsid.lower(), genotype, filename):
+                    chromosome = findChromosome(rsid.lower(), genotype, filename)
+                    magnitude = cells[1].get_text().strip()
+                    summary = cells[2].get_text().strip()
+                    geneInfo.append([rsid.lower(), genotype, chromosome, magnitude, summary])
+    return geneInfo
+
+
+
+
+
+
+
+
+
+
+
+
